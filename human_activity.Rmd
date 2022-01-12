@@ -361,7 +361,6 @@ This suggests anything from 3-5 clusters is recommended approach.
 sil <- silhouette(km2$cluster, dist(cluster_analysis_2))
 fviz_silhouette(sil)
 
-
 ```
 
 By the Silhouette plot we can say that the data is some time miss classified into wrong cluster but the overall index values is greater than 0 that means observation is well clustered but not as good because more or less it is equal 0. 
