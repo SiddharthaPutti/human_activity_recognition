@@ -1,8 +1,10 @@
 ---
-title: "Group 7 project 2"
-output:
-  pdf_document:
-    latex_engine: xelatex
+title: "clustering analysis"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 ---
 
 ```{r setup, include=FALSE}
@@ -67,18 +69,18 @@ library(wordcloud)
 library(reshape2)
 ```
 
-# Quick look at the data
+### Quick look at the data
 
 
-``` {r echo=FALSE}
+``` {r }
 
 load_file <- function(filePath){
   
   data = read.csv(filePath,header = FALSE, sep = " ")
   return(data)
 }
-data = read.csv("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/train/X_train.csv")
-col_names = load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/features.txt")
+data = read.csv("C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/train/X_train.csv")
+col_names = load_file("C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/features.txt")
 
 colnames(data) = c(col_names$V2)
 dim(data)
@@ -86,10 +88,10 @@ data[1:5,1:5]
 
 ```
 
-# 1. As we know there are 6 activities performed, lets consider kmeans with 6 centroid clusters at first and change accordingly. For now just thowing the data to k means model with 6 clusters.
+### 1. As we know there are 6 activities performed, lets consider kmeans with 6 centroid clusters at first and change accordingly. For now just thowing the data to k means model with 6 clusters.
 
 
-```{r, warning=FALSE, message=FALSE, echo=FALSE,fig.width=8,fig.height=3}
+```{r, warning=FALSE, message=FALSE,fig.width=8,fig.height=3}
 
 set.seed(20)
 km <- kmeans(data, 6, nstart=80)
@@ -102,11 +104,11 @@ fviz_cluster(km, data = data,
 )
 ```
 
-## Findings: we can see that though given 6 centroid/means to the algorithm, this seems to have many overlappings for the dataset, but there is a significant difference in cluster on the left vs right side. 
+### Findings: we can see that though given 6 centroid/means to the algorithm, this seems to have many overlappings for the dataset, but there is a significant difference in cluster on the left vs right side. 
 
-# plotting with in sum of squares graph to determine optimal number of clusters.
+### plotting with in sum of squares graph to determine optimal number of clusters.
 
-```{r , echo=FALSE,fig.width=8,fig.height=4}
+```{r ,fig.width=8,fig.height=4}
 
 wssplot <- function(data, nc=15, seed=123){
   wss <- (nrow(data)-1)*sum(apply(data,2,var))
@@ -120,24 +122,24 @@ wssplot(data, nc = 20)
 
 ```
 
-## findings: the with in sum of squares graph shows the same as we predicted, it suggests to have 2-3 clusters as optimal value. but we need data to have segmented into 6 different activities. lets find out what the two clusters are and if we can make this any better.
+### findings: the with in sum of squares graph shows the same as we predicted, it suggests to have 2-3 clusters as optimal value. but we need data to have segmented into 6 different activities. lets find out what the two clusters are and if we can make this any better.
 
 
 
-# Firstly lets do some data wrangling to get the labelled data as a column to main data for visualization.
+### Firstly lets do some data wrangling to get the labelled data as a column to main data for visualization.
 
 ### creating the data frame required.
 
-```{r echo=FALSE}
+```{r }
 
 
-data["subject"] <- load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/train/subject_train.txt")
+data["subject"] <- load_file("C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/train/subject_train.txt")
 
-Activity <-  load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/train/y_train.txt")
+Activity <-  load_file("C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/train/y_train.txt")
 colnames(Activity) = c("Activities")
 
 
-Activity_labels <- load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/activity_labels.txt")
+Activity_labels <- load_file("C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/activity_labels.txt")
 colnames(Activity_labels) = c("Activity_id","Activity")
 
 
@@ -149,14 +151,14 @@ data["Activity"] = Activity
 
 #saving into csv file 
 
-write.csv(data, "C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/dataset.csv", row.names = FALSE)
+write.csv(data, "C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/dataset.csv", row.names = FALSE)
 ```
 
 
 
-```{r , echo=FALSE}
+```{r }
 
-censor_data = read.csv("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/dataset.csv", check.names = FALSE)
+censor_data = read.csv("C:/Users/sid31/Downloads/human activity recognition/human_activity_recognition/UCI HAR Dataset/dataset.csv", check.names = FALSE)
 
 # the column names have many unnecessary letters, lets try removing them 
 censor_data <- data.frame(censor_data)
@@ -176,12 +178,12 @@ colnames(censor_data) = columns
 #censor_data['tBodyAccMagmean']
 ```
 
-# Probability distributions 
+### Probability distributions 
 
 ### finding tht probablility mass funcition and cummulative density function over all the activities named in the dataset. 
 
 
-```{r echo=FALSE}
+```{r }
 
 library('dplyr')
 
@@ -198,9 +200,9 @@ prob_freq
 
 Findings: The Probability mass function for different activities are shown and laying has the highest PMF.
 
-## Pmf vs Activity plot 
+### Pmf vs Activity plot 
 
-```{r echo=FALSE,fig.width=12,fig.height=5}
+```{r fig.width=12,fig.height=5}
 ggplot(prob_freq, aes(num_in_type, activity_pmf)) +
   geom_bar(stat="identity", fill="steelblue")+
   theme_bw() +
@@ -212,11 +214,11 @@ ggplot(prob_freq, aes(num_in_type, activity_pmf)) +
 
 ```
 
-# Investigate participants activity durations.
+### Investigate participants activity durations.
 
-## we know that 30 participants have recorded the activities through sensors, lets check if there is any skewness in the records provided.
+### we know that 30 participants have recorded the activities through sensors, lets check if there is any skewness in the records provided.
 
-```{r, fig.width=12,fig.height=5, echo=FALSE}
+```{r, fig.width=12,fig.height=5}
 
 #lets see participants activity duration 
 
@@ -231,11 +233,11 @@ ggplot(as.data.frame(tbl), aes(factor(subject), Freq, fill = Activity)) +
 
 ```
 
-# Findings: we can clearly say that Nearly all participants have more data for walking upstairs than downstairs. Assuming an equal number of up- and down-walks the participants need longer walking upstairs.
+### Findings: we can clearly say that Nearly all participants have more data for walking upstairs than downstairs. Assuming an equal number of up- and down-walks the participants need longer walking upstairs.
 
-## Also the stationary activities are more recorded than moving activities.
+### Also the stationary activities are more recorded than moving activities.
 
-# Lets find out if our optimal cluster segmentation is regarding stationary and moving activities.
+### Lets find out if our optimal cluster segmentation is regarding stationary and moving activities.
 
 ```{r,  fig.width=12,fig.height=5,echo=FALSE}
 ggplot(censor_data, aes(x=tBodyAccMagmean, colour=Activity)) + geom_density() + 
@@ -245,14 +247,14 @@ ggplot(censor_data, aes(x=tBodyAccMagmean, colour=Activity)) + geom_density() +
 
 ```
 
-## As aspected from most real world data, when participants are moving the data is normally distributed with some long tail.
+### As aspected from most real world data, when participants are moving the data is normally distributed with some long tail.
 
-## Findings: It is now clear that our kmeans have given optimal clusters as 2 because it segregated the data into moving and stationary activities. lets analyse the same with different plots.  
+### Findings: It is now clear that our kmeans have given optimal clusters as 2 because it segregated the data into moving and stationary activities. lets analyse the same with different plots.  
 
 
 ### lets find out how both the clusters vary with different plots and define silhouette plot vs with-in sum of squares recommendation of number of clusters.  
 
-```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.width=12,fig.height=5}
+```{r, warning=FALSE, message=FALSE,fig.width=12,fig.height=5}
 
 
 df1 <- filter(censor_data, Activity == "WALKING" | 
@@ -269,7 +271,7 @@ ggplot(df2, aes(x=tBodyAccMagmean, colour=Activity)) + geom_density()  + xlim(-1
 ```
 
 
-```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.width=12,fig.height=5}
+```{r, warning=FALSE, message=FALSE,fig.width=12,fig.height=5}
 
 
 set.seed(45)
@@ -293,7 +295,7 @@ fviz_cluster(km1, data = cluster_analysis_1,
 
 The cluster seems to have many overlappings individually. 
 
-```{r warning=FALSE,message=FALSE, echo=FALSE,fig.width=12,fig.height=5}
+```{r warning=FALSE,message=FALSE,fig.width=12,fig.height=5}
 
 km2 <- kmeans(cluster_analysis_2, 3, nstart=80)
 fviz_cluster(km2, data = cluster_analysis_2,
@@ -310,7 +312,7 @@ fviz_cluster(km2, data = cluster_analysis_2,
 
 Plot with-in sum of squares/elbow method to determine the number of clusters recommended for stationary vs moving activities. 
 
-```{r, warning=FALSE, echo=FALSE,fig.width=8,fig.height=4}
+```{r, warning=FALSE,fig.width=8,fig.height=4}
 
 wssplot <- function(data, nc=15, seed=123){
   wss <- (nrow(data)-1)*sum(apply(data,2,var))
@@ -330,7 +332,7 @@ So, the interpretation of the silhouette width is the following:
 - Si < 0 means that the observation was placed in the wrong cluster.
 - Si = 0 means that the observation is between two clusters.
 
-```{r echo=FALSE,fig.width=12,fig.height=5}
+```{r fig.width=12,fig.height=5}
 
 
 sil <- silhouette(km1$cluster, dist(cluster_analysis_1))
@@ -341,7 +343,7 @@ fviz_silhouette(sil)
 
 we see that there are some misclassified data points with respect to silhouette plot. overall the data points are well clustered that is above 0. 
 
-```{r, warning=FALSE, echo=FALSE,fig.width=8,fig.height=4}
+```{r, warning=FALSE,fig.width=8,fig.height=4}
 
 wssplot <- function(data, nc=15, seed=123){
   wss <- (nrow(data)-1)*sum(apply(data,2,var))
@@ -357,7 +359,7 @@ wssplot(cluster_analysis_2, nc = 20)
 
 This suggests anything from 3-5 clusters is recommended approach. 
 
-```{r echo=FALSE,fig.width=12,fig.height=5}
+```{r fig.width=12,fig.height=5}
 sil <- silhouette(km2$cluster, dist(cluster_analysis_2))
 fviz_silhouette(sil)
 
