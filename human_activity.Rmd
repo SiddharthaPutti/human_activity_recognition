@@ -1,0 +1,370 @@
+---
+title: "Group 7 project 2"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+# Introduction
+
+This project is to build a model that classifies the human activities such as Walking, Walking_Upstairs, Walking_Downstairs, Sitting, Standing or Laying.
+
+30 participants(referred as subjects in this dataset) performed activities of daily living while carrying a waist-mounted smartphone. The phone was configured to record two implemented sensors (accelerometer and gyroscope). For these time series the directors of the underlying study performed feature generation and generated the dataset by moving a fixed-width window of 2.56s over the series. Since the windows had 50% overlap the resulting points are equally spaced (1.28s).This experiment was video recorded to label the data manually.
+
+
+
+These signals were used to estimate variables of the feature vector for each pattern:  
+'-XYZ' is used to denote 3-axial signals in the X, Y and Z directions.
+
+tBodyAcc-XYZ  \
+tGravityAcc-XYZ \
+tBodyAccJerk-XYZ \
+tBodyGyro-XYZ \
+tBodyGyroJerk-XYZ \
+tBodyAccMag \
+tGravityAccMag \
+tBodyAccJerkMag \newline
+tBodyGyroMag \newline
+tBodyGyroJerkMag \newline
+fBodyAcc-XYZ \newline
+fBodyAccJerk-XYZ \newline
+fBodyGyro-XYZ \newline
+fBodyAccMag \newline
+fBodyAccJerkMag \newline
+fBodyGyroMag \newline
+fBodyGyroJerkMag \newline
+
+
+```{r include=FALSE}
+#tinytex::install_tinytex()
+library('dplyr')
+library('ggplot2')
+library('factoextra')
+library("plyr")
+library("stringr")
+library('stringi')
+library("ggplot2")
+library('cluster')
+library (devtools)
+#install_github("trinker/qdapRegex")
+library(qdapRegex)
+library(lubridate)
+library(ggplot2)
+library(readr)
+library(tidytext)
+library(stringr)
+library(tidyselect)
+data(stop_words)
+library(tidytext)
+library(wordcloud)
+library(reshape2)
+```
+
+# Quick look at the data
+
+
+``` {r echo=FALSE}
+
+load_file <- function(filePath){
+  
+  data = read.csv(filePath,header = FALSE, sep = " ")
+  return(data)
+}
+data = read.csv("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/train/X_train.csv")
+col_names = load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/features.txt")
+
+colnames(data) = c(col_names$V2)
+dim(data)
+data[1:5,1:5]
+
+```
+
+# 1. As we know there are 6 activities performed, lets consider kmeans with 6 centroid clusters at first and change accordingly. For now just thowing the data to k means model with 6 clusters.
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE,fig.width=8,fig.height=3}
+
+set.seed(20)
+km <- kmeans(data, 6, nstart=80)
+fviz_cluster(km, data = data,
+             palette = c("orange","blue","green","yellow","red","violet"),
+             ellipse.type = "norm",
+             star.plot = TRUE,
+             repel = TRUE,
+             ggtheme = theme_minimal()
+)
+```
+
+## Findings: we can see that though given 6 centroid/means to the algorithm, this seems to have many overlappings for the dataset, but there is a significant difference in cluster on the left vs right side. 
+
+# plotting with in sum of squares graph to determine optimal number of clusters.
+
+```{r , echo=FALSE,fig.width=8,fig.height=4}
+
+wssplot <- function(data, nc=15, seed=123){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of groups",
+       ylab="Sum of squares within a group")}
+
+wssplot(data, nc = 20)
+
+```
+
+## findings: the with in sum of squares graph shows the same as we predicted, it suggests to have 2-3 clusters as optimal value. but we need data to have segmented into 6 different activities. lets find out what the two clusters are and if we can make this any better.
+
+
+
+# Firstly lets do some data wrangling to get the labelled data as a column to main data for visualization.
+
+### creating the data frame required.
+
+```{r echo=FALSE}
+
+
+data["subject"] <- load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/train/subject_train.txt")
+
+Activity <-  load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/train/y_train.txt")
+colnames(Activity) = c("Activities")
+
+
+Activity_labels <- load_file("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/activity_labels.txt")
+colnames(Activity_labels) = c("Activity_id","Activity")
+
+
+for (i in Activity_labels$Activity_id){
+  Activity$Activities[Activity$Activities == i] =  Activity_labels$Activity[i]
+}
+
+data["Activity"] = Activity
+
+#saving into csv file 
+
+write.csv(data, "C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/dataset.csv", row.names = FALSE)
+```
+
+
+
+```{r , echo=FALSE}
+
+censor_data = read.csv("C:/Users/sid31/Downloads/human activity recognition/UCI HAR Dataset/dataset.csv", check.names = FALSE)
+
+# the column names have many unnecessary letters, lets try removing them 
+censor_data <- data.frame(censor_data)
+columns = colnames(censor_data)
+
+
+columns  = str_replace(columns, '[(]','')
+columns  = str_replace(columns, '[)]','')
+columns  = str_replace(columns, '[-]','')
+columns  = str_replace(columns, '[,]','')
+columns  = str_replace(columns, '[.]','')
+columns  = str_replace(columns, '[.]','')
+columns  = str_replace(columns, '[.]','')
+columns  = str_replace(columns, '[.]','')
+colnames(censor_data) = columns
+
+#censor_data['tBodyAccMagmean']
+```
+
+# Probability distributions 
+
+### finding tht probablility mass funcition and cummulative density function over all the activities named in the dataset. 
+
+
+```{r echo=FALSE}
+
+library('dplyr')
+
+prob_freq <- censor_data %>%
+  select(tBodyAccmeanX, tBodyAccmeanY, tBodyAccmeanZ,Activity) %>%
+  group_by(Activity) %>%
+  dplyr::summarize(num_in_type = n()) %>%
+  mutate(activity_pmf = num_in_type/sum(num_in_type)) %>%
+  mutate(activity_cdf = cumsum(activity_pmf))
+
+prob_freq
+
+```
+
+Findings: The Probability mass function for different activities are shown and laying has the highest PMF.
+
+## Pmf vs Activity plot 
+
+```{r echo=FALSE,fig.width=12,fig.height=5}
+ggplot(prob_freq, aes(num_in_type, activity_pmf)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  theme_bw() +
+  labs( y = 'activity Probability') +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous("Activities", labels = as.character(prob_freq$Activity),
+                     breaks = prob_freq$num_in_type)
+
+
+```
+
+# Investigate participants activity durations.
+
+## we know that 30 participants have recorded the activities through sensors, lets check if there is any skewness in the records provided.
+
+```{r, fig.width=12,fig.height=5, echo=FALSE}
+
+#lets see participants activity duration 
+
+
+
+tbl <- with(censor_data, table(Activity,subject))
+
+ggplot(as.data.frame(tbl), aes(factor(subject), Freq, fill = Activity)) +     
+  geom_col(position = 'dodge') +
+  labs(title = "Data provided by each user") +
+  labs(x = "subject" , y = "count")
+
+```
+
+# Findings: we can clearly say that Nearly all participants have more data for walking upstairs than downstairs. Assuming an equal number of up- and down-walks the participants need longer walking upstairs.
+
+## Also the stationary activities are more recorded than moving activities.
+
+# Lets find out if our optimal cluster segmentation is regarding stationary and moving activities.
+
+```{r,  fig.width=12,fig.height=5,echo=FALSE}
+ggplot(censor_data, aes(x=tBodyAccMagmean, colour=Activity)) + geom_density() + 
+  annotate("text", x = -0.7, y = 25, label = "Stationary Activities") +
+  annotate("text", x = 0.5, y = 5, label = "Moving Activities")
+
+
+```
+
+## As aspected from most real world data, when participants are moving the data is normally distributed with some long tail.
+
+## Findings: It is now clear that our kmeans have given optimal clusters as 2 because it segregated the data into moving and stationary activities. lets analyse the same with different plots.  
+
+
+### lets find out how both the clusters vary with different plots and define silhouette plot vs with-in sum of squares recommendation of number of clusters.  
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.width=12,fig.height=5}
+
+
+df1 <- filter(censor_data, Activity == "WALKING" | 
+                Activity == "WALKING_UPSTAIRS" | Activity == "WALKING_DOWNSTAIRS")
+
+df2 <- filter(censor_data , Activity == "SITTING" | 
+                Activity == "STANDING" | Activity == "LAYING")
+
+ggplot(df1, aes(x=tBodyAccMagmean, colour=Activity)) + geom_density() + ggtitle("Moving Activities")
+ggplot(df2, aes(x=tBodyAccMagmean, colour=Activity)) + geom_density()  + xlim(-1.0,-0.8) + ylim(0,40) + ggtitle("Stationary Activities")
+
+
+
+```
+
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.width=12,fig.height=5}
+
+
+set.seed(45)
+
+cluster_analysis_1 = within(df1, rm('subject','Activity'))
+cluster_analysis_2 = within(df2, rm('subject','Activity'))
+
+
+km1 <- kmeans(cluster_analysis_1, 3, nstart=80)
+fviz_cluster(km1, data = cluster_analysis_1,
+             palette = c("orange","blue","green"),
+             ellipse.type = "norm",
+             star.plot = TRUE,
+             repel = TRUE,
+             ggtheme = theme_minimal(),
+             xlab = FALSE,
+             ylab = FALSE
+)
+
+```
+
+The cluster seems to have many overlappings individually. 
+
+```{r warning=FALSE,message=FALSE, echo=FALSE,fig.width=12,fig.height=5}
+
+km2 <- kmeans(cluster_analysis_2, 3, nstart=80)
+fviz_cluster(km2, data = cluster_analysis_2,
+             palette = c("orange","blue","green"),
+             ellipse.type = "norm",
+             star.plot = TRUE,
+             repel = TRUE,
+             ggtheme = theme_minimal(),
+             xlab = FALSE,
+             ylab = FALSE
+)
+
+```
+
+Plot with-in sum of squares/elbow method to determine the number of clusters recommended for stationary vs moving activities. 
+
+```{r, warning=FALSE, echo=FALSE,fig.width=8,fig.height=4}
+
+wssplot <- function(data, nc=15, seed=123){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of groups",
+       ylab="Sum of squares within a group")}
+
+wssplot(cluster_analysis_1, nc = 20)
+
+```
+lets look at the cluster validation using silhouette coefficient 
+
+So, the interpretation of the silhouette width is the following:
+- Si > 0 means that the observation is well clustered. The closest it is to 1, the best it is clustered.
+- Si < 0 means that the observation was placed in the wrong cluster.
+- Si = 0 means that the observation is between two clusters.
+
+```{r echo=FALSE,fig.width=12,fig.height=5}
+
+
+sil <- silhouette(km1$cluster, dist(cluster_analysis_1))
+fviz_silhouette(sil)
+
+
+```
+
+we see that there are some misclassified data points with respect to silhouette plot. overall the data points are well clustered that is above 0. 
+
+```{r, warning=FALSE, echo=FALSE,fig.width=8,fig.height=4}
+
+wssplot <- function(data, nc=15, seed=123){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of groups",
+       ylab="Sum of squares within a group")}
+
+wssplot(cluster_analysis_2, nc = 20)
+
+```
+
+This suggests anything from 3-5 clusters is recommended approach. 
+
+```{r echo=FALSE,fig.width=12,fig.height=5}
+sil <- silhouette(km2$cluster, dist(cluster_analysis_2))
+fviz_silhouette(sil)
+
+
+```
+
+By the Silhouette plot we can say that the data is some time miss classified into wrong cluster but the overall index values is greater than 0 that means observation is well clustered but not as good because more or less it is equal 0. 
+
+## Conclusion: The cluster analysis for the activities are recorded and we have seen the clusters are pretty much far away and classified as requirement. 
+
